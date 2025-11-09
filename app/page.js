@@ -18,33 +18,30 @@ export default function TextToImage() {
     setImage(null);
 
     try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            inputs: prompt,
-            options: {
-              wait_for_model: true
-            }
-          }),
-        }
-      );
+      // Ab hum apne own API ko call karenge
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      });
+
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error('API request failed');
+        throw new Error(data.error || 'Something went wrong');
       }
 
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setImage(imageUrl);
+      if (data.image) {
+        setImage(data.image);
+      } else {
+        throw new Error('No image received');
+      }
+
     } catch (err) {
-      setError('Error generating image. Please try again.');
-      console.error(err);
+      console.error('Error:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -132,7 +129,7 @@ export default function TextToImage() {
             borderRadius: '8px'
           }}>
             <h3 style={{ color: '#333', marginBottom: '15px' }}>
-              Your Generated Image:
+              Generated Image:
             </h3>
             <img 
               src={image} 
