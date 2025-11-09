@@ -5,13 +5,12 @@ export async function POST(request) {
     if (!prompt) {
       return new Response(JSON.stringify({ error: 'Prompt is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    // Hugging Face API call
+    // Use stable diffusion model
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5',
+      'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1',
       {
         method: 'POST',
         headers: {
@@ -19,43 +18,35 @@ export async function POST(request) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          inputs: prompt,
-          options: {
-            wait_for_model: true
-          }
+          inputs: prompt.substring(0, 500) // Limit length
         }),
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
+    if (response.status === 503) {
       return new Response(JSON.stringify({ 
-        error: `Hugging Face API error: ${response.status}` 
-      }), {
-        status: response.status,
-        headers: { 'Content-Type': 'application/json' }
-      });
+        error: 'Model is loading. Please try again in 30 seconds.' 
+      }), { status: 503 });
     }
 
-    // Convert image to base64
+    if (!response.ok) {
+      const error = await response.text();
+      return new Response(JSON.stringify({ 
+        error: `API Error: ${response.status}. Please check your token permissions.` 
+      }), { status: response.status });
+    }
+
     const imageBuffer = await response.arrayBuffer();
     const base64Image = Buffer.from(imageBuffer).toString('base64');
 
     return new Response(JSON.stringify({
       image: `data:image/jpeg;base64,${base64Image}`,
       success: true
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    }));
 
   } catch (error) {
-    console.error('Server error:', error);
     return new Response(JSON.stringify({ 
-      error: 'Internal server error' 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+      error: 'Server error: ' + error.message 
+    }), { status: 500 });
   }
 }
